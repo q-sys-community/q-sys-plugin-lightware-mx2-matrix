@@ -459,6 +459,7 @@ if Controls then
         fnSend("OPEN", "/MEDIA/XP/VIDEO")
 
         fnSend("GET", "/MEDIA/XP/VIDEO.DestinationConnectionStatus")
+        fnSend("GET", "/MEDIA/XP/VIDEO.SourcePortStatus")
     end
     conn.Reconnect = function(conn)
         print("TCP socket is reconnecting")
@@ -553,7 +554,7 @@ if Controls then
                             -- HDCP Status
                             --Controls["VideoSourceHDCPStatus"..p] = (data:sub(4, 4) == "B" or data:sub(4, 4) == "F")
                             -- Signal Present
-                            Controls["input_signal"][p].Value = (data:sub(5, 5) == "F")
+                            Controls["input_signal"][p].Value = (data:sub(3, 3) == "F")
                             -- Connection Status
                             --Controls["VideoSourceConnection"..p] = (data:sub(5, 5) == "B" or data:sub(5, 5) == "F")
                         end
@@ -597,7 +598,14 @@ if Controls then
     end
     for i = 1, output_count do
         Controls["output_" .. i].EventHandler = function()
-            tie_command(Controls["output_" .. i].String, i)
+            for p = 1, input_count do
+                Controls["input_" .. p .. "-output_" .. i].Boolean = p == Controls["output_" .. i].String
+            end
+            if Controls["output_" .. i].String == "0" then
+                fnSend("CALL", string.format("/MEDIA/XP/VIDEO:switch(0:O%1i)", i))
+            else
+                tie_command(Controls["output_" .. i].String, i)
+            end
         end
         Controls["video_mute_" .. i].EventHandler = function()
             if Controls["video_mute_" .. i].Boolean then
