@@ -40,7 +40,7 @@ function GetProperties()
         {
             Name = "Model",
             Type = "enum",
-            Choices = {"MX2-4x4", "MX2-8x4","MX2-8x8", "MX2-16x8", "MX2-16x16", "MX2-24x24", "MX2-32x32","MX2-48x48"},
+            Choices = {"MX2-4x4", "MX2-8x4", "MX2-8x8", "MX2-16x8", "MX2-16x16", "MX2-24x24", "MX2-32x32", "MX2-48x48"},
             Value = "MX2-4x4"
         }
         --[[ -- for future use
@@ -101,24 +101,14 @@ function GetControls(props)
             Count = 1,
             UserPin = true
         },
-        {
+        --[[{
             Name = "firmware_version",
             ControlType = "Indicator",
             IndicatorType = "Text",
             PinStyle = "Output",
             Count = 1,
             UserPin = true
-        },
-        {
-            Name = "temperature",
-            ControlType = "Knob",
-            ControlUnit = "Integer",
-            PinStyle = "Output",
-            Min = 0,
-            Max = 125,
-            Count = 1,
-            UserPin = true
-        },
+        },]]
         {
             Name = "input_signal",
             ControlType = "Indicator",
@@ -177,12 +167,12 @@ end
 -- This function allows you to layout pages in your plugin.
 function GetControlLayout(props)
     local layout = {}
-    
-    input_count, output_count = string.match(string.sub(props["Model"].Value, 4,-1), "(%d+)x(%d+)")
+
+    input_count, output_count = string.match(string.sub(props["Model"].Value, 4, -1), "(%d+)x(%d+)")
 
     local title_size = {224, 32}
     local btn_size = {32, 24}
-    local status_groupbox_size = {title_size[1], 7*btn_size[2]}
+    local status_groupbox_size = {title_size[1], 5 * btn_size[2]}
     local matrix_groupbox_position = {0, title_size[2] + status_groupbox_size[2] + (0.5 * btn_size[2])}
     local matrix_groupbox_size = {
         72 + (output_count * btn_size[1]),
@@ -255,7 +245,7 @@ function GetControlLayout(props)
             Position = {0, title_size[2] + (3.5 * btn_size[2])},
             Size = {3 * btn_size[1], btn_size[2]}
         },
-        {
+        --[[{
             Type = "Text",
             Text = "Firmware:",
             Font = "Roboto",
@@ -265,18 +255,7 @@ function GetControlLayout(props)
             Color = Colors.White,
             Position = {0, title_size[2] + (4.5 * btn_size[2])},
             Size = {3 * btn_size[1], btn_size[2]}
-        },
-        {
-            Type = "Text",
-            Text = "Temp(°C):",
-            Font = "Roboto",
-            FontSize = 12,
-            FontStyle = "Bold",
-            HTextAlign = "Right",
-            Color = Colors.White,
-            Position = {0, title_size[2] + (5.5 * btn_size[2])},
-            Size = {3 * btn_size[1], btn_size[2]}
-        },
+        },]]
         {
             Type = "GroupBox",
             Text = "Matrix",
@@ -351,19 +330,12 @@ function GetControlLayout(props)
         Position = {3 * btn_size[1], title_size[2] + (3.5 * btn_size[2])},
         Size = {3 * btn_size[1], btn_size[2]}
     }
-    layout["firmware_version"] = {
+    --[[layout["firmware_version"] = {
         PrettyName = "System~Firmware Version",
         Style = "Text",
         Position = {3 * btn_size[1], title_size[2] + (4.5 * btn_size[2])},
         Size = {3 * btn_size[1], btn_size[2]}
-    }
-    layout["temperature"] = {
-        PrettyName = "System~Temperature",
-        Style = "Text",
-        Color = {223, 0, 36},
-        Position = {3 * btn_size[1], title_size[2] + (5.5 * btn_size[2])},
-        Size = {3 * btn_size[1], btn_size[2]}
-    }
+    }]]
     for i = 1, output_count do -- For each output
         layout["output_" .. i] = {
             PrettyName = "Output " .. i .. "~Select",
@@ -466,7 +438,7 @@ if Controls then
             Controls["input_" .. i .. "-output_" .. outp].Boolean = i == tonumber(inp)
         end
     end
-    
+
     function tie_command(inp, outp)
         fnSend("CALL", string.format("/MEDIA/XP/VIDEO:switch(I%1i:O%1i)", inp, outp))
     end
@@ -474,29 +446,35 @@ if Controls then
     -- Setup Utility Callbacks as required
     conn.Connected = function(conn)
         print("TCP socket is connected")
-
+        Controls.online.Boolean = true
         -- Get Meta Data
         fnSend("GET", "/.*")
 
         -- Get and Subscribe to System State Data
-        fnSend("GET", "/MANAGEMENT/STATUS.*")
-        fnSend("OPEN", "/MANAGEMENT/STATUS.*")
+        --fnSend("GET", "/MANAGEMENT/STATUS.*")
+        --fnSend("OPEN", "/MANAGEMENT/STATUS.*")
 
         -- Get and Subscribe to Video Routing Data
-        fnSend("GET", "/MEDIA/XP/VIDEO.*")
-        fnSend("OPEN", "/MEDIA/XP/VIDEO.*")
+        fnSend("GET", "/MEDIA/XP/VIDEO")
+        fnSend("OPEN", "/MEDIA/XP/VIDEO")
+
+        fnSend("GET", "/MEDIA/XP/VIDEO.DestinationConnectionStatus")
     end
     conn.Reconnect = function(conn)
         print("TCP socket is reconnecting")
+        Controls.online.Boolean = false
     end
     conn.Closed = function(conn)
         print("TCP socket was closed by the remote end")
+        Controls.online.Boolean = false
     end
     conn.Error = function(conn, err)
         print("TCP socket had an error:" .. err)
+        Controls.online.Boolean = false
     end
     conn.Timeout = function(conn, err)
         print("TCP socket timed out:" .. err)
+        Controls.online.Boolean = false
     end
 
     -- Helper Function - Open TCP Connection
@@ -523,7 +501,7 @@ if Controls then
         -- Read out lines from the buffer
         line = conn:ReadLine(TcpSocket.EOL.Any)
         while (line ~= nil) do
-            --print(line)
+            print(line)
             -- Remove the header
             x = line:find(" ")
             if x ~= nil then
@@ -557,14 +535,11 @@ if Controls then
                         --Controls.UpTime.Value = val
                         -- Stop and restart Comms timer
                         timerComms:Stop()
-                        if Controls.online then -- Check for when developing in a Control Script block
-                            Controls.online.Boolean = true
-                        end
                         timerComms:Start(30)
                     end
                     -- Firmware
                     if func == "CpuFirmware" then
-                        Controls.firmware_version.String = val
+                    --Controls.firmware_version.String = val
                     end
                 elseif path == "/MEDIA/XP/VIDEO" then -- Video Crosspoint
                     if func == "SourcePortStatus" then -- Contains byte level data for Source Ports
@@ -597,9 +572,11 @@ if Controls then
                             -- Connection Status
                             --Controls["VideoDestConnection"..p] = (data:sub(5, 5) == "B" or data:sub(5, 5) == "F")
                         end
-                    elseif func == "DestinationConnectionList" then
+                    elseif func == "DestinationConnectionStatus" then
                         for p, data in ipairs(split(val, ";")) do
-                            matrix_feedback(data:sub(2, -1), p)
+                            local n = string.sub(data, string.find(data, "%d+"))
+                            print(n)
+                            matrix_feedback(n, p)
                         end
                     end
                 end
@@ -634,8 +611,13 @@ if Controls then
     for i = 1, output_count do
         for p = 1, input_count do
             Controls["input_" .. p .. "-output_" .. i].EventHandler = function()
-                Controls["output_" .. i].String = tostring(p)
-                tie_command(Controls["output_" .. i].String, i)
+                if Controls["input_" .. p .. "-output_" .. i].Boolean == true then
+                    Controls["output_" .. i].String = tostring(p)
+                    tie_command(Controls["output_" .. i].String, i)
+                else
+                    Controls["output_" .. i].String = "0"
+                    fnSend("CALL", string.format("/MEDIA/XP/VIDEO:switch(0:O%1i)", i))
+                end
             end
         end
     end
